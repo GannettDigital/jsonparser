@@ -718,7 +718,7 @@ func Delete(data []byte, keys ...string) []byte {
 		newOffset = prevTok + 1
 	}
 
-	// We have to make a copy here if we don't want to mangle the original data, because byte slices are
+	// We have to make a copy here if we don't want to mangle the original data, because byte arrays are
 	// accessed by reference and not by value
 	dataCopy := make([]byte, len(data))
 	copy(dataCopy, data)
@@ -930,7 +930,7 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 		return -1, MalformedJsonError
 	}
 
-	offset = nT+1
+	offset = nT + 1
 
 	if len(keys) > 0 {
 		if offset = searchKeys(data, keys...); offset == -1 {
