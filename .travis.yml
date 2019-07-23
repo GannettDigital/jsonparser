@@ -11,7 +11,7 @@ before_install:
     - go get github.com/mattn/goveralls
 
 script:
-    - go test -v -race -parallel 4 -coverprofile=coverage.txt -covermode=atomic -coverpkg=github.com/GannettDigital/jsonparser
+    - go test -v -race -parallel 4 -coverprofile=coverage.txt -covermode=atomic -coverpkg=./...
 
 after_success:
     - goveralls -coverprofile=coverage.txt -service=travis-ci
