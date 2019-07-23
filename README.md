@@ -1,6 +1,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/GannettDigital/jsonparser)](https://goreportcard.com/report/github.com/buger/jsonparser) ![License](https://img.shields.io/dub/l/vibe-d.svg)
 # Gannett Fork
-This is a fork of the jsonparser library from https://github.com/buger/jsonparser. We have established our own fork to fix a bug in which byte slices were being passed by reference then using an append which in turn modified the original data. A copy was added and used in the append. This solves the issue that can be seen https://github.com/buger/jsonparser/issues/145.
+This is a fork of the jsonparser library from https://github.com/buger/jsonparser.
+We have established our own fork, as the library appears to be no longer maintained, to fix a bug in which byte slices were being passed by
+reference then using an append which in turn modified the original data.
+A copy was added and used in the append.
+This solves the issue that can be seen https://github.com/buger/jsonparser/issues/145.
+The issue of the Get String infinite loop was also fixed in this fork https://github.com/buger/jsonparser/issues/164
 # Alternative JSON parser for Go (so far fastest)
 
 It does not require you to know the structure of the payload (eg. create structs), and allows accessing fields by providing the path to them. It is up to **10 times faster** than standard `encoding/json` package (depending on payload size and usage), **allocates no memory**. See benchmarks below.
