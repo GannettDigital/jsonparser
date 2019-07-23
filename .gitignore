@@ -1,8 +1,10 @@
-
+.idea
+vendor/
+bin/
+coverage.txt
+.DS_Store
 *.test
-
 *.out
-
 *.mprof
 
 .idea
