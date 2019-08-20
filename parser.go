@@ -916,6 +916,19 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 	offset = 1
 
 	if len(keys) > 0 {
+		// Detects nil in the path given
+		// for i, v := range data {
+		//fmt.Printf("index: [%d]   value: %s   address: [%v]\n", i, string(v), &v)
+		// if &i == nil {
+		// 	fmt.Println("YAY")
+		// 	return offset, ArrayEachNullError
+		// }
+		//}
+
+		if strings.Contains(string(data), "nil") {
+			return offset, ArrayEachNullError
+		}
+
 		if offset = searchKeys(data, keys...); offset == -1 {
 			return offset, KeyPathNotFoundError
 		}
@@ -927,11 +940,6 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 		}
 
 		offset += nO
-
-		// Detects nil in the path given
-		if strings.Contains(strings.Join(keys, " "), "") {
-			return offset, ArrayEachNullError
-		}
 
 		if data[offset] != '[' {
 			return offset, MalformedArrayError
