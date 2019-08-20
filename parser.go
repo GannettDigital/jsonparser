@@ -916,16 +916,7 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 	offset = 1
 
 	if len(keys) > 0 {
-		// Detects nil in the path given
-		// for i, v := range data {
-		//fmt.Printf("index: [%d]   value: %s   address: [%v]\n", i, string(v), &v)
-		// if &i == nil {
-		// 	fmt.Println("YAY")
-		// 	return offset, ArrayEachNullError
-		// }
-		//}
-
-		if strings.Contains(string(data), "nil") {
+		if strings.Contains(string(data), "null") {
 			return offset, ArrayEachNullError
 		}
 
