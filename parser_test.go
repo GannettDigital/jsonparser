@@ -1258,13 +1258,35 @@ func TestArrayEach(t *testing.T) {
 }
 
 func TestArrayEachNull(t *testing.T) {
-	mock := []byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`)
+	funcError := func([]byte, ValueType, int, error) { t.Errorf("Could not iterate through array because value is null") }
 
-	ArrayEach(mock, func(value []byte, dataType ValueType, offset int, err error) {
-		if err != ArrayEachNullError {
-			t.Errorf("Did not catch the right error: %v", err)
-		}
-	}, "a", "b")
+	type args struct {
+		data []byte
+		cb   func(value []byte, dataType ValueType, offset int, err error)
+		keys []string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantOffset int
+		wantErr    bool
+	}{
+		{"Array in second key's value with null", args{[]byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`), funcError, []string{}}, 1, false},
+		{"Third key's value is null", args{[]byte(`{"a":{"b":["one","two"]},"c":null}`), funcError, []string{}}, 1, false},
+		{"Third key's value is null, second key's value is <HERE>", args{[]byte(`{"a":{"b":<HERE>["one","two"]},"c":null}`), funcError, []string{}}, 1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotOffset, err := ArrayEach(tt.args.data, tt.args.cb, tt.args.keys...)
+			if (err != nil) == tt.wantErr {
+				t.Errorf("ArrayEach() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOffset != tt.wantOffset {
+				t.Errorf("ArrayEach() = %v, want %v", gotOffset, tt.wantOffset)
+			}
+		})
+	}
 }
 
 func TestArrayEachEmpty(t *testing.T) {

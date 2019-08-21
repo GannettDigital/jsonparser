@@ -20,7 +20,7 @@ var (
 	MalformedValueError        = errors.New("Value looks like Number/Boolean/None, but can't find its end: ',' or '}' symbol")
 	OverflowIntegerError       = errors.New("Value is number, but overflowed while parsing")
 	MalformedStringEscapeError = errors.New("Encountered an invalid escape sequence in a string")
-	ArrayEachNullError         = errors.New("Could not iterate through array because value is nil")
+	ArrayEachNullError         = errors.New("Could not iterate through array because value is null")
 )
 
 // How much stack space to allocate for unescaping JSON strings; if a string longer
@@ -916,10 +916,6 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 	offset = 1
 
 	if len(keys) > 0 {
-		if strings.Contains(string(data), "null") {
-			return offset, ArrayEachNullError
-		}
-
 		if offset = searchKeys(data, keys...); offset == -1 {
 			return offset, KeyPathNotFoundError
 		}
@@ -945,6 +941,9 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 	}
 
 	offset += nO
+	if strings.Contains(string(data), "null") {
+		return offset, ArrayEachNullError
+	}
 
 	if data[offset] == ']' {
 		return offset, nil
