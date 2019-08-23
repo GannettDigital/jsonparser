@@ -28,9 +28,10 @@ func toStringArray(data []byte) (result []string) {
 }
 
 type GetTest struct {
-	desc string
-	json string
-	path []string
+	desc        string
+	json        string
+	path        []string
+	wantIterate string
 
 	isErr   bool
 	isFound bool
@@ -1258,7 +1259,10 @@ func TestArrayEach(t *testing.T) {
 }
 
 func TestArrayEachNull(t *testing.T) {
-	funcError := func([]byte, ValueType, int, error) { t.Errorf("Could not iterate through array because value is null") }
+	count := 0
+	funcError := func([]byte, ValueType, int, error) {
+		count++
+	}
 
 	type args struct {
 		data []byte
@@ -1269,18 +1273,75 @@ func TestArrayEachNull(t *testing.T) {
 		name       string
 		args       args
 		wantOffset int
-		wantErr    bool
+		wantErr    error
+		wantCount  int
 	}{
-		{"Array in second key's value with null", args{[]byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`), funcError, []string{}}, 1, false},
-		{"Third key's value is null", args{[]byte(`{"a":{"b":["one","two"]},"c":null}`), funcError, []string{}}, 1, false},
-		{"Third key's value is null, second key's value is <HERE>", args{[]byte(`{"a":{"b":<HERE>["one","two"]},"c":null}`), funcError, []string{}}, 1, false},
+		{
+			name: "Checking null in array, should be fine",
+			args: args{
+				data: []byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`),
+				cb:   funcError,
+				keys: []string{"a", "b"},
+			},
+			wantOffset: 24,
+			wantErr:    nil,
+			wantCount:  1,
+		},
+		{
+			name: "Checking empty array, should be fine",
+			args: args{
+				data: []byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`),
+				cb:   funcError,
+				keys: []string{"d"},
+			},
+			wantOffset: 41,
+			wantErr:    nil,
+			wantCount:  0,
+		},
+		{
+			name: "Checking null in c-key, should error ArrayEachNullError",
+			args: args{
+				data: []byte(`{"a":{"b":<HERE>["one","two"]},"c": null}`),
+				cb:   funcError,
+				keys: []string{"c"},
+			},
+			wantOffset: 36,
+			wantErr:    ArrayEachNullError,
+			wantCount:  0,
+		},
+		{
+			name: "Checking value in a, should error MalformedArrayError for missing subkey",
+			args: args{
+				data: []byte(`{"a":{"b":<HERE>["one","two"]},"c":null}`),
+				cb:   funcError,
+				keys: []string{"a"},
+			},
+			wantOffset: 5,
+			wantErr:    MalformedArrayError,
+			wantCount:  0,
+		},
+		{
+			name: "Checking null in subkey b, should be KeyPathNotFoundError for missing key",
+			args: args{
+				data: []byte(`{"a":{},"c":null}`),
+				cb:   funcError,
+				keys: []string{"a", "b"},
+			},
+			wantOffset: -1,
+			wantErr:    KeyPathNotFoundError,
+			wantCount:  0,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			count = 0
 			gotOffset, err := ArrayEach(tt.args.data, tt.args.cb, tt.args.keys...)
-			if (err != nil) == tt.wantErr {
+			if err != tt.wantErr {
 				t.Errorf("ArrayEach() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.wantCount != count {
+				t.Errorf("Count is %d, want %d", count, tt.wantCount)
 			}
 			if gotOffset != tt.wantOffset {
 				t.Errorf("ArrayEach() = %v, want %v", gotOffset, tt.wantOffset)
