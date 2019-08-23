@@ -28,9 +28,10 @@ func toStringArray(data []byte) (result []string) {
 }
 
 type GetTest struct {
-	desc string
-	json string
-	path []string
+	desc        string
+	json        string
+	path        []string
+	wantIterate string
 
 	isErr   bool
 	isFound bool
@@ -887,18 +888,18 @@ var getStringTests = []GetTest{
 		data:    "value\b\f\n\r\tvalue", // value is unescaped since this is GetString()
 	},
 	{ // This test checks we avoid an infinite loop for certain malformed JSON. We don't check for all malformed JSON as it would reduce performance.
-		desc: `malformed with double quotes`,
-		json: `{"a"":1}`,
-		path: []string{"a"},
+		desc:    `malformed with double quotes`,
+		json:    `{"a"":1}`,
+		path:    []string{"a"},
 		isFound: false,
-		data: ``,
+		data:    ``,
 	},
 	{ // More malformed JSON testing, to be sure we avoid an infinite loop.
-		desc: `malformed with double quotes, and path does not exist`,
-		json: `{"z":123,"y":{"x":7,"w":0},"v":{"u":"t","s":"r","q":0,"p":1558051800},"a":"b","c":"2016-11-02T20:10:11Z","d":"e","f":"g","h":{"i":"j""},"k":{"l":"m"}}`,
-		path: []string{"o"},
+		desc:    `malformed with double quotes, and path does not exist`,
+		json:    `{"z":123,"y":{"x":7,"w":0},"v":{"u":"t","s":"r","q":0,"p":1558051800},"a":"b","c":"2016-11-02T20:10:11Z","d":"e","f":"g","h":{"i":"j""},"k":{"l":"m"}}`,
+		path:    []string{"o"},
 		isFound: false,
-		data: ``,
+		data:    ``,
 	},
 }
 
@@ -1255,6 +1256,98 @@ func TestArrayEach(t *testing.T) {
 			t.Errorf("Should process only 4 items")
 		}
 	}, "a", "b")
+}
+
+func TestArrayEachNull(t *testing.T) {
+	count := 0
+	funcError := func([]byte, ValueType, int, error) {
+		count++
+	}
+
+	type args struct {
+		data []byte
+		cb   func(value []byte, dataType ValueType, offset int, err error)
+		keys []string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantOffset int
+		wantErr    error
+		wantCount  int
+	}{
+		{
+			name: "Checking null in array, should be fine",
+			args: args{
+				data: []byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`),
+				cb:   funcError,
+				keys: []string{"a", "b"},
+			},
+			wantOffset: 24,
+			wantErr:    nil,
+			wantCount:  1,
+		},
+		{
+			name: "Checking empty array, should be fine",
+			args: args{
+				data: []byte(`{"a":{"z":null,"b":[null],"c":null},"d":[]}`),
+				cb:   funcError,
+				keys: []string{"d"},
+			},
+			wantOffset: 41,
+			wantErr:    nil,
+			wantCount:  0,
+		},
+		{
+			name: "Checking null in c-key, should error ArrayEachNullError",
+			args: args{
+				data: []byte(`{"a":{"b":<HERE>["one","two"]},"c": null}`),
+				cb:   funcError,
+				keys: []string{"c"},
+			},
+			wantOffset: 36,
+			wantErr:    ArrayEachNullError,
+			wantCount:  0,
+		},
+		{
+			name: "Checking value in a, should error MalformedArrayError because value is an object",
+			args: args{
+				data: []byte(`{"a":{"b":<HERE>["one","two"]},"c":null}`),
+				cb:   funcError,
+				keys: []string{"a"},
+			},
+			wantOffset: 5,
+			wantErr:    MalformedArrayError,
+			wantCount:  0,
+		},
+		{
+			name: "Checking null in subkey b, should be KeyPathNotFoundError for missing key",
+			args: args{
+				data: []byte(`{"a":{},"c":null}`),
+				cb:   funcError,
+				keys: []string{"a", "b"},
+			},
+			wantOffset: -1,
+			wantErr:    KeyPathNotFoundError,
+			wantCount:  0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			count = 0
+			gotOffset, err := ArrayEach(tt.args.data, tt.args.cb, tt.args.keys...)
+			if err != tt.wantErr {
+				t.Errorf("ArrayEach() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantCount != count {
+				t.Errorf("Count is %d, want %d", count, tt.wantCount)
+			}
+			if gotOffset != tt.wantOffset {
+				t.Errorf("ArrayEach() = %v, want %v", gotOffset, tt.wantOffset)
+			}
+		})
+	}
 }
 
 func TestArrayEachEmpty(t *testing.T) {

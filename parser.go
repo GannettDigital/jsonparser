@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // Errors
@@ -19,6 +20,7 @@ var (
 	MalformedValueError        = errors.New("Value looks like Number/Boolean/None, but can't find its end: ',' or '}' symbol")
 	OverflowIntegerError       = errors.New("Value is number, but overflowed while parsing")
 	MalformedStringEscapeError = errors.New("Encountered an invalid escape sequence in a string")
+	ArrayEachNullError         = errors.New("Could not iterate through array because value is null")
 )
 
 // How much stack space to allocate for unescaping JSON strings; if a string longer
@@ -285,7 +287,7 @@ func searchKeys(data []byte, keys ...string) int {
 			if !lastMatched {
 				end := blockEnd(data[i:], '{', '}')
 				i += end - 1
-			} else{
+			} else {
 				level++
 			}
 		case '}':
@@ -927,6 +929,9 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 		offset += nO
 
 		if data[offset] != '[' {
+			if strings.HasPrefix(string(data[offset:]), "null") {
+				return offset, ArrayEachNullError
+			}
 			return offset, MalformedArrayError
 		}
 
