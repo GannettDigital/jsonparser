@@ -929,6 +929,9 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 		offset += nO
 
 		if data[offset] != '[' {
+			if strings.HasPrefix(string(data[offset:]), "null") {
+				return offset, ArrayEachNullError
+			}
 			return offset, MalformedArrayError
 		}
 
@@ -941,9 +944,6 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 	}
 
 	offset += nO
-	if strings.Contains(string(data), "null") {
-		return offset, ArrayEachNullError
-	}
 
 	if data[offset] == ']' {
 		return offset, nil
