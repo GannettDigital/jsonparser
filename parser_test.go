@@ -1310,7 +1310,7 @@ func TestArrayEachNull(t *testing.T) {
 			wantCount:  0,
 		},
 		{
-			name: "Checking value in a, should error MalformedArrayError for missing subkey",
+			name: "Checking value in a, should error MalformedArrayError because value is an object",
 			args: args{
 				data: []byte(`{"a":{"b":<HERE>["one","two"]},"c":null}`),
 				cb:   funcError,
