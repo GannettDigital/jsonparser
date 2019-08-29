@@ -796,7 +796,11 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 		} else {
 			startOffset = depthOffset
 		}
-		value = append(data[:startOffset], append(createInsertComponent(keys[depth:], setValue, comma, object), data[depthOffset:]...)...)
+
+		// Similar to Delete, we have to make a copy here if we don't want to mangle the original data.
+		dataCopy := make([]byte, len(data))
+		copy(dataCopy, data)
+		value = append(dataCopy[:startOffset], append(createInsertComponent(keys[depth:], setValue, comma, object), dataCopy[depthOffset:]...)...)
 	} else {
 		// path currently exists
 		startComponent := data[:startOffset]
