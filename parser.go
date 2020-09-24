@@ -100,9 +100,15 @@ func findKeyStart(data []byte, key string) (int, error) {
 			}
 
 		case '[':
-			i = blockEnd(data[i:], data[i], ']') + i
+			end := blockEnd(data[i:], data[i], ']')
+			if end != -1 {
+				i = i + end
+			}
 		case '{':
-			i = blockEnd(data[i:], data[i], '}') + i
+			end := blockEnd(data[i:], data[i], '}')
+			if end != -1 {
+				i = i + end
+			}
 		}
 		i++
 	}
@@ -263,19 +269,23 @@ func searchKeys(data []byte, keys ...string) int {
 					keyUnesc = ku
 				}
 
-				if equalStr(&keyUnesc, keys[level-1]) {
-					lastMatched = true
+				if level <= len(keys) {
+					if equalStr(&keyUnesc, keys[level-1]) {
+						lastMatched = true
 
-					// if key level match
-					if keyLevel == level-1 {
-						keyLevel++
-						// If we found all keys in path
-						if keyLevel == lk {
-							return i + 1
+						// if key level match
+						if keyLevel == level-1 {
+							keyLevel++
+							// If we found all keys in path
+							if keyLevel == lk {
+								return i + 1
+							}
 						}
+					} else {
+						lastMatched = false
 					}
 				} else {
-					lastMatched = false
+					return -1
 				}
 			} else {
 				i--
@@ -286,6 +296,9 @@ func searchKeys(data []byte, keys ...string) int {
 			// can move to the end of this block
 			if !lastMatched {
 				end := blockEnd(data[i:], '{', '}')
+				if end == -1 {
+					return -1
+				}
 				i += end - 1
 			} else {
 				level++
@@ -380,7 +393,6 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 		}
 	}
 
-	var stackbuf [unescapeStackBufSize]byte // stack-allocated array for allocation-free unescaping of small strings
 	pathsBuf := make([]string, maxPath)
 
 	for i < ln {
@@ -412,6 +424,7 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 				// for unescape: if there are no escape sequences, this is cheap; if there are, it is a
 				// bit more expensive, but causes no allocations unless len(key) > unescapeStackBufSize
 				var keyUnesc []byte
+				var stackbuf [unescapeStackBufSize]byte
 				if !keyEscaped {
 					keyUnesc = key
 				} else if ku, err := Unescape(key, stackbuf[:]); err != nil {
@@ -438,12 +451,8 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 						pathsMatched++
 						pathFlags |= bitwiseFlags[pi+1]
 
-						v, dt, of, e := Get(data[i:])
+						v, dt, _, e := Get(data[i:])
 						cb(pi, v, dt, e)
-
-						if of != -1 {
-							i += of
-						}
 
 						if pathsMatched == len(paths) {
 							break
@@ -490,10 +499,11 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 				if len(p) < level+1 || pathFlags&bitwiseFlags[pi+1] != 0 || p[level][0] != '[' || !sameTree(p, pathsBuf[:level]) {
 					continue
 				}
-
-				aIdx, _ := strconv.Atoi(p[level][1 : len(p[level])-1])
-				arrIdxFlags |= bitwiseFlags[aIdx+1]
-				pIdxFlags |= bitwiseFlags[pi+1]
+				if len(p[level]) >= 2 {
+					aIdx, _ := strconv.Atoi(p[level][1 : len(p[level])-1])
+					arrIdxFlags |= bitwiseFlags[aIdx+1]
+					pIdxFlags |= bitwiseFlags[pi+1]
+				}
 			}
 
 			if arrIdxFlags > 0 {
@@ -594,15 +604,17 @@ func createInsertComponent(keys []string, setValue []byte, comma, object bool) [
 	if comma {
 		buffer.WriteString(",")
 	}
-	if isIndex {
+	if isIndex && !comma {
 		buffer.WriteString("[")
 	} else {
 		if object {
 			buffer.WriteString("{")
 		}
-		buffer.WriteString("\"")
-		buffer.WriteString(keys[0])
-		buffer.WriteString("\":")
+		if !isIndex {
+			buffer.WriteString("\"")
+			buffer.WriteString(keys[0])
+			buffer.WriteString("\":")
+		}
 	}
 
 	for i := 1; i < len(keys); i++ {
@@ -622,7 +634,7 @@ func createInsertComponent(keys []string, setValue []byte, comma, object bool) [
 			buffer.WriteString("}")
 		}
 	}
-	if isIndex {
+	if isIndex && !comma {
 		buffer.WriteString("]")
 	}
 	if object && !isIndex {
@@ -756,7 +768,7 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 		if endOffset == -1 {
 			firstToken := nextToken(data)
 			// We can't set a top-level key if data isn't an object
-			if len(data) == 0 || data[firstToken] != '{' {
+			if firstToken < 0 || data[firstToken] != '{' {
 				return nil, KeyPathNotFoundError
 			}
 			// Don't need a comma if the input is an empty object
@@ -771,7 +783,9 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 		depthOffset := endOffset
 		if depth != 0 {
 			// if subpath is a non-empty object, add to it
-			if data[startOffset] == '{' && data[startOffset+1+nextToken(data[startOffset+1:])] != '}' {
+			// or if subpath is a non-empty array, add to it
+			if (data[startOffset] == '{' && data[startOffset+1+nextToken(data[startOffset+1:])] != '}') ||
+				(data[startOffset] == '[' && data[startOffset+1+nextToken(data[startOffset+1:])] == '{') && keys[depth:][0][0] == 91 {
 				depthOffset--
 				startOffset = depthOffset
 				// otherwise, over-write it with a new object
@@ -908,7 +922,7 @@ func internalGet(data []byte, keys ...string) (value []byte, dataType ValueType,
 		value = value[1 : len(value)-1]
 	}
 
-	return value, dataType, offset, endOffset, nil
+	return value[:len(value):len(value)], dataType, offset, endOffset, nil
 }
 
 // ArrayEach is used when iterating arrays, accepts a callback function with the same return arguments as `Get`.
@@ -917,7 +931,12 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 		return -1, MalformedObjectError
 	}
 
-	offset = 1
+	nT := nextToken(data)
+	if nT == -1 {
+		return -1, MalformedJsonError
+	}
+
+	offset = nT + 1
 
 	if len(keys) > 0 {
 		if offset = searchKeys(data, keys...); offset == -1 {
@@ -996,7 +1015,6 @@ func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int
 
 // ObjectEach iterates over the key-value pairs of a JSON object, invoking a given callback for each such entry
 func ObjectEach(data []byte, callback func(key []byte, value []byte, dataType ValueType, offset int) error, keys ...string) (err error) {
-	var stackbuf [unescapeStackBufSize]byte // stack-allocated array for allocation-free unescaping of small strings
 	offset := 0
 
 	// Descend to the desired key, if requested
@@ -1050,6 +1068,7 @@ func ObjectEach(data []byte, callback func(key []byte, value []byte, dataType Va
 
 		// Unescape the string if needed
 		if keyEscaped {
+			var stackbuf [unescapeStackBufSize]byte // stack-allocated array for allocation-free unescaping of small strings
 			if keyUnescaped, err := Unescape(key, stackbuf[:]); err != nil {
 				return MalformedStringEscapeError
 			} else {
