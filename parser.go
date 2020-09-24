@@ -600,6 +600,9 @@ var (
 
 func createInsertComponent(keys []string, setValue []byte, comma, object bool) []byte {
 	var buffer bytes.Buffer
+	if len(keys) == 0 || len(keys[0]) == 0 {
+		return buffer.Bytes()
+	}
 	isIndex := string(keys[0][0]) == "["
 	if comma {
 		buffer.WriteString(",")
@@ -742,6 +745,11 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 	// ensure keys are set
 	if len(keys) == 0 {
 		return nil, KeyPathNotFoundError
+	}
+	for _, key := range keys {
+		if key == "" {
+			return nil, KeyPathNotFoundError
+		}
 	}
 
 	_, _, startOffset, endOffset, err := internalGet(data, keys...)

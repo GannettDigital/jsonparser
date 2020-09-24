@@ -424,6 +424,13 @@ var setTests = []SetTest{
 		isFound: false,
 	},
 	{
+		desc:    "set non-existant second key",
+		json:    `{"test":"input"}`,
+		path:    []string{"test", ""},
+		setData: `"new value"`,
+		isFound: false,
+	},
+	{
 		desc:    "set key in invalid json",
 		json:    `{"test"::"input"}`,
 		path:    []string{"test"},
