@@ -28,9 +28,10 @@ func toStringArray(data []byte) (result []string) {
 }
 
 type GetTest struct {
-	desc string
-	json string
-	path []string
+	desc        string
+	json        string
+	path        []string
+	wantIterate string
 
 	isErr   bool
 	isFound bool
@@ -1420,9 +1421,9 @@ func TestArrayEachWithWhiteSpace(t *testing.T) {
 		keys []string
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantErr    bool
+		name    string
+		args    args
+		wantErr bool
 	}{
 		{"Array with white space", args{[]byte(`    ["AAA", "BBB", "CCC"]`), funcSuccess, []string{}}, false},
 		{"Array with only one character after white space", args{[]byte(`    1`), funcError, []string{}}, true},
@@ -1675,7 +1676,7 @@ func TestEachKey(t *testing.T) {
 		{"arrInt", "[3]"},
 		{"arrInt", "[5]"}, // Should not find last key
 		{"nested"},
-		{"arr", "["}, // issue#177 Invalid arguments
+		{"arr", "["},   // issue#177 Invalid arguments
 		{"a\n", "b\n"}, // issue#165
 	}
 
